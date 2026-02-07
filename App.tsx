@@ -1,12 +1,4 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React from 'react';
-import type {PropsWithChildren} from 'react';
+import React, {useRef} from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -15,51 +7,94 @@ import {
   Text,
   useColorScheme,
   View,
+  Button,
+  PermissionsAndroid,
+  Platform,
+  NativeModules,
+  Alert,
 } from 'react-native';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+import {Colors, Header} from 'react-native/Libraries/NewAppScreen';
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+const {CallBridge} = NativeModules;
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
+/* -------------------------------
+   PERMISSIONS
+-------------------------------- */
+
+async function requestCallPermissions(type: 'audio' | 'video') {
+  if (Platform.OS !== 'android') return true;
+
+  if (Platform.Version >= 33) {
+    const notif = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+    );
+    if (notif !== PermissionsAndroid.RESULTS.GRANTED) {
+      Alert.alert('Permission required', 'Notification permission needed');
+      return false;
+    }
+  }
+
+  const mic = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
   );
+  if (mic !== PermissionsAndroid.RESULTS.GRANTED) return false;
+
+  if (type === 'video') {
+    const cam = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+    );
+    if (cam !== PermissionsAndroid.RESULTS.GRANTED) return false;
+  }
+
+  return true;
 }
+
+/* -------------------------------
+   APP
+-------------------------------- */
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
+  const serviceStartedRef = useRef(false);
 
   const backgroundStyle = {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+    flex: 1,
+  };
+
+  const ensureCoreService = async () => {
+    if (serviceStartedRef.current) return;
+
+    const ok = await requestCallPermissions('audio');
+    if (!ok) return;
+
+    CallBridge.startCoreService();
+    serviceStartedRef.current = true;
+  };
+
+  const startAudioCall = async () => {
+    const ok = await requestCallPermissions('audio');
+    if (!ok) return;
+
+    await ensureCoreService();
+
+    CallBridge.startCallService('Test User', 'audio');
+    CallBridge.openCallScreen(); // foreground case
+  };
+
+  const startVideoCall = async () => {
+    const ok = await requestCallPermissions('video');
+    if (!ok) return;
+
+    await ensureCoreService();
+
+    CallBridge.startCallService('Test User', 'video');
+    CallBridge.openCallScreen();
+  };
+
+  const endCall = () => {
+    CallBridge.endCall();
   };
 
   return (
@@ -68,28 +103,24 @@ function App(): React.JSX.Element {
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={backgroundStyle.backgroundColor}
       />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
+
+      <ScrollView contentInsetAdjustmentBehavior="automatic">
         <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
+
+        <View style={styles.container}>
+          <Text style={styles.title}>Native Calling Test</Text>
+
+          <View style={styles.btn}>
+            <Button title="Start Audio Call" onPress={startAudioCall} />
+          </View>
+
+          <View style={styles.btn}>
+            <Button title="Start Video Call" onPress={startVideoCall} />
+          </View>
+
+          <View style={styles.btn}>
+            <Button title="End Call" color="red" onPress={endCall} />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -97,22 +128,9 @@ function App(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
+  container: {padding: 24},
+  title: {fontSize: 22, fontWeight: '700', marginBottom: 20},
+  btn: {marginVertical: 10},
 });
 
 export default App;
