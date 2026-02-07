@@ -1,13 +1,19 @@
 package com.foregrounsdservice.calling.core
 
 object CallSession {
-    var userName = "Unknown"
-    var callType = "audio"
-    var state = CallState.IDLE
+    var userName: String = "Test User"
+    var callType: String = "audio"
+
+    // 🔥 MOST IMPORTANT (timer ke liye)
+    var callStartTime: Long = 0L
+
+    fun start(user: String, type: String) {
+        userName = user
+        callType = type
+        callStartTime = System.currentTimeMillis()
+    }
 
     fun clear() {
-        userName = "Unknown"
-        callType = "audio"
-        state = CallState.IDLE
+        callStartTime = 0L
     }
 }

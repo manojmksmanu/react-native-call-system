@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.foregrounsdservice.calling.ui.CallActivity
-import com.foregrounsdservice.R
 
 object CallNotification {
 
@@ -16,9 +15,9 @@ object CallNotification {
     private const val CHANNEL_CORE = "dozo_core"
     private const val CHANNEL_CALL = "dozo_call"
 
-    /* ------------------------------------------------
-       CREATE CHANNELS (MANDATORY for Android O+)
-    ------------------------------------------------ */
+    /* -------------------------------
+       CHANNELS
+    -------------------------------- */
 
     fun createChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -26,61 +25,51 @@ object CallNotification {
         val manager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // 🔹 CORE (Foreground background service)
-        val coreChannel = NotificationChannel(
-            CHANNEL_CORE,
-            "Dozo Background Service",
-            NotificationManager.IMPORTANCE_LOW // ❗ NOT MIN
-        ).apply {
-            description = "Keeps Dozo Live running"
-            setShowBadge(false)
-            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
-        }
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_CORE,
+                "Dozo Background",
+                NotificationManager.IMPORTANCE_LOW
+            )
+        )
 
-        // 🔹 CALL (Active call notification)
-        val callChannel = NotificationChannel(
-            CHANNEL_CALL,
-            "Dozo Call",
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "Ongoing call"
-            setShowBadge(true)
-            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-        }
-
-        manager.createNotificationChannel(coreChannel)
-        manager.createNotificationChannel(callChannel)
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_CALL,
+                "Dozo Call",
+                NotificationManager.IMPORTANCE_HIGH
+            )
+        )
     }
 
-    /* ------------------------------------------------
-       CORE FOREGROUND NOTIFICATION
-    ------------------------------------------------ */
+    /* -------------------------------
+       CORE NOTIFICATION
+    -------------------------------- */
 
-    fun core(context: Context): Notification {
-        return NotificationCompat.Builder(context, CHANNEL_CORE)
+    fun core(context: Context): Notification =
+        NotificationCompat.Builder(context, CHANNEL_CORE)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentTitle("Dozo Live")
-            .setContentText("Dozo Live is running")
+            .setContentText("Service running")
             .setOngoing(true)
             .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setForegroundServiceBehavior(
-                NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
-            )
             .build()
-    }
 
-    /* ------------------------------------------------
-       CALL NOTIFICATION (Tap → CallActivity)
-    ------------------------------------------------ */
+    /* -------------------------------
+       CALL NOTIFICATION (PURE UI)
+    -------------------------------- */
 
-    fun call(context: Context, userName: String): Notification {
+    fun call(
+        context: Context,
+        userName: String,
+        elapsedText: String
+    ): Notification {
 
         val intent = Intent(context, CallActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
-        val pendingIntent = PendingIntent.getActivity(
+        val pi = PendingIntent.getActivity(
             context,
             0,
             intent,
@@ -89,14 +78,13 @@ object CallNotification {
 
         return NotificationCompat.Builder(context, CHANNEL_CALL)
             .setSmallIcon(android.R.drawable.sym_call_incoming)
-            .setContentTitle("Call in progress")
-            .setContentText(userName)
+            .setContentTitle(userName)
+            .setContentText("Call duration • $elapsedText")
             .setOngoing(true)
-            .setAutoCancel(false)
-            .setContentIntent(pendingIntent)
+            .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pi)
             .build()
     }
 }
